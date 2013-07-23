@@ -34,6 +34,10 @@ class FakeWalUploader(object):
             raise segment._upload_explosive
 
         segment._uploaded = True
+
+        if not segment.explicit:
+            segment.mark_done()
+
         return segment
 
 

@@ -154,10 +154,7 @@ class WalTransferGroup(object):
 
         if g.successful():
             try:
-                segment = g.get()
-
-                if not segment.explicit:
-                    segment.mark_done()
+                g.get()
             except StandardError, e:
                 # Absorb and forward exceptions across the channel.
                 placed = e

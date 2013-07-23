@@ -208,6 +208,11 @@ class WalUploader(object):
                                          s3_url, segment.path,
                                          self.gpg_key_id)
 
+        # Mark completion if the segment was uploaded before Postgres'
+        # explicit request.
+        if not segment.explicit:
+            segment.mark_done()
+
         logger.info(
             msg='completed archiving to a file ',
             detail=('Archiving to "{s3_url}" complete at '
