@@ -42,6 +42,79 @@ class SegmentNumber(collections.namedtuple('SegmentNumber',
         assert len(self.seg) == 8
         return int(self.log + self.seg, 16)
 
+    @staticmethod
+    def _integer_to_name(integral):
+        h = hex(integral)
+        assert h.startswith('0x')
+        assert len(h) <= 10
+
+        name = hex(integral)[2:].zfill(8)
+        assert len(name) == 8
+
+        return name
+
+    def next_smaller(self):
+        int_seg = int(self.seg, 16)
+        assert int_seg <= 0xFF
+
+        if int_seg == 0:
+            # Seg is at the minimum value, carry the decrement from
+            # 'log'.
+            int_log = int(self.log, 16)
+            assert int_log <= 0xFFFFFFFF
+
+            # 0 is a valid int_log, but not when decrementing from a
+            # 0-valued segment: negative such values are not valid.
+            assert int_seg == 0 and int_log > 0
+
+            # NB: older versions of Postgres won't generate a seg
+            # value of 0xFF, so a gap has to be treated
+            # conservatively.
+            s_log = SegmentNumber._integer_to_name(int_log - 1)
+            s_seg = SegmentNumber._integer_to_name(0xFF)
+
+            return self.__class__(log=s_log, seg=s_seg)
+        else:
+            assert int_seg > 0
+
+            s_log = self.log
+            s_seg = SegmentNumber._integer_to_name(int_seg - 1)
+
+            return self.__class__(log=s_log, seg=s_seg)
+
+        assert False
+
+    def next_larger(self):
+        int_seg = int(self.seg, 16)
+        assert int_seg <= 0xFF
+
+        if int_seg == 0xFF:
+            # Seg is at the maximum value, carry the increment into
+            # 'log'.
+            #
+            # NB: older versions of Postgres won't generate a seg
+            # value of 0xFF, so a gap has to be treated
+            # conservatively.
+            int_log = int(self.log, 16)
+
+            # Blow up if int_log would otherwise overflow.  Almost
+            # certainly a bug...or Postgres is going to exhaust its
+            # XLog addressing, too.
+            assert int_log < 0xFFFFFFFF
+
+            l_log = SegmentNumber._integer_to_name(int_log + 1)
+            l_seg = SegmentNumber._integer_to_name(0)
+
+            return self.__class__(l_log, l_seg)
+        else:
+            l_log = self.log
+            l_seg = SegmentNumber._integer_to_name(int_seg + 1)
+
+            return self.__class__(l_log, l_seg)
+
+        assert False
+
+
 # Exhaustively enumerates all possible metadata about a backup.  These
 # may not always all be filled depending what access method is used to
 # get information, in which case the unfilled items should be given a
