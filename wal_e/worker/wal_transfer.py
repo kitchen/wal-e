@@ -15,6 +15,25 @@ class WalSegment(object):
         self.explicit = explicit
         self.name = path.basename(self.path)
 
+    @property
+    def tli(self):
+        match = s3_storage.SEGMENT_REGEXP.match(self.name)
+
+        if match:
+            return match.groupdict()['tli']
+
+        return None
+
+    @property
+    def segment_number(self):
+        match = s3_storage.SEGMENT_REGEXP.match(self.name)
+
+        if match:
+            gd = match.groupdict()
+            return s3_storage.SegmentNumber(log=gd['log'], seg=gd['seg'])
+
+        return None
+
     def mark_done(self):
         """Mark the archive status of this segment as 'done'.
 
@@ -74,6 +93,16 @@ class WalSegment(object):
 
                 yield WalSegment(seg_path, explicit=False)
 
+    def future_segment_stream(self):
+        sn = self.segment_number
+
+        if sn is None:
+            # Can't project from this 'segment'; it's probably
+            # actually a .history file or something like that.
+            return
+
+        yield sn.next_larger()
+
 
 class WalTransferGroup(object):
     """Concurrency and metadata manipulation for parallel transfers.
@@ -120,14 +149,14 @@ class WalTransferGroup(object):
                 gevent.killall(self.greenlets, block=True, timeout=60)
                 raise val
 
-    def start(self, segment):
+    def start(self, *args, **kwargs):
         """Begin transfer for an indicated wal segment."""
 
         if self.closed:
             raise UserCritical(msg='attempt to transfer wal after closing',
                                hint='report a bug')
 
-        g = gevent.Greenlet(self.transferer, segment)
+        g = gevent.Greenlet(self.transferer, *args, **kwargs)
         g.link(self._complete_execution)
         self.greenlets.add(g)
 

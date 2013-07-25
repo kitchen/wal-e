@@ -20,6 +20,7 @@ from wal_e.exception import UserException, UserCritical
 from wal_e.storage import s3_storage
 from wal_e.worker import PgBackupStatements
 from wal_e.worker import PgControlDataParser
+from wal_e.worker import PrefetchDirs
 
 logger = log_help.WalELogger(__name__, level=logging.INFO)
 
@@ -377,42 +378,46 @@ class S3Backup(object):
         # Wait for uploads to finish.
         group.join()
 
-    def wal_s3_restore(self, wal_name, wal_destination):
+    def wal_s3_restore(self, wal_name, wal_destination, concurrency=1):
         """
-        Downloads a WAL file from S3
+        Downloads up to 'concurrency' number of WAL files from S3
 
         This code is intended to typically be called from Postgres's
         restore_command feature.
 
         NB: Postgres doesn't guarantee that wal_name ==
         basename(wal_path), so both are required.
-
         """
+        xlog_dir = path.dirname(wal_destination)
+        pd = None
 
-        s3_url = '{0}/wal_{1}/{2}.lzo'.format(
-            self.s3_prefix, FILE_STRUCTURE_VERSION, wal_name)
+        if concurrency > 1:
+            pd = PrefetchDirs(xlog_dir)
+            pd.create()
 
-        logger.info(
-            msg='begin wal restore',
-            structured={'action': 'wal-fetch',
-                        'key': s3_url,
-                        'seg': wal_name,
-                        'prefix': self.s3_prefix,
-                        'state': 'begin'})
+        segment = worker.WalSegment(wal_name, explicit=True)
 
-        ret = s3_worker.do_lzop_s3_get(
-            self.aws_access_key_id, self.aws_secret_access_key,
-            s3_url, wal_destination, self.gpg_key_id is not None)
+        if pd and not segment.segment_number:
+            # Not a regular segment, which represents a prefetch
+            # hazard.  Turn off concurrency (and thus prefetching)
+            # this run, and delete the prefetch data.
+            concurrency = 1
+            pd.clear()
 
-        logger.info(
-            msg='complete wal restore',
-            structured={'action': 'wal-fetch',
-                        'key': s3_url,
-                        'seg': wal_name,
-                        'prefix': self.s3_prefix,
-                        'state': 'complete'})
+        downloader = s3_worker.WalDownloader(self.aws_access_key_id,
+                                             self.aws_secret_access_key,
+                                             self.s3_prefix,
+                                             pd,
+                                             self.gpg_key_id)
+        group = worker.WalTransferGroup(downloader)
+        group.start(segment, wal_destination)
+        started = 1
+        seg_stream = segment.future_segment_stream()
 
-        return ret
+        while started < concurrency:
+            prefetched_segment = seg_stream.next()
+            group.start(prefetched_segment)
+            started += 1
 
     def delete_old_versions(self, dry_run):
         assert s3_storage.CURRENT_VERSION not in s3_storage.OBSOLETE_VERSIONS

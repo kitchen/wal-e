@@ -228,6 +228,81 @@ class WalUploader(object):
         return segment
 
 
+class WalDownloader(object):
+
+    def __init__(self, aws_access_key_id, aws_secret_access_key,
+                 prefix, prefetch_dir, gpg_key_id=None):
+        self.aws_access_key_id = aws_access_key_id
+        self.aws_secret_access_key = aws_secret_access_key
+        self.prefix = prefix
+        self.prefetch_dir = prefetch_dir
+        self.gpg_key_id = gpg_key_id
+
+    def _download(self, segment, place):
+        s3_url = '{0}/wal_{1}/{2}.lzo'.format(
+            self.prefix, s3_storage.CURRENT_VERSION, segment.name)
+
+        logger.info(
+            msg='begin wal restore',
+            structured={'action': 'wal-fetch',
+                        'key': s3_url,
+                        'seg': segment.name,
+                        'prefix': self.prefix,
+                        'state': 'begin'})
+
+        ret = do_lzop_s3_get(self.aws_access_key_id,
+                             self.aws_secret_access_key,
+                             s3_url, place,
+                             self.gpg_key_id is not None)
+
+        info = {'action': 'wal-fetch',
+                'key': s3_url,
+                'seg': segment.name,
+                'prefix': self.prefix}
+
+        if ret:
+            info.update({'state': 'complete'})
+            logger.info(msg='wal fetched',
+                        **info)
+
+        else:
+            info.update({'state': 'error'})
+
+            raise UserException(
+                msg='wal not located',
+                hint=('This can be normal when Postgres is trying to '
+                      'detect what timelines are available during '
+                      'restoration.'),
+                **info)
+
+        return ret
+
+    def __call__(self, segment, wal_destination):
+        if segment.explicit:
+            if self.prefetch_dir.contains(segment):
+                # Already pre-fetched the WAL: rename it into the
+                # destination and exit.
+                self.prefetch_dir.promote(segment, wal_destination)
+                return
+
+            # Prefetch miss: have to actually do a download.
+            #
+            # Exception raised to terminate execution if the download
+            # could not complete.
+            self._download(segment, wal_destination)
+        else:
+            try:
+                with self.prefetch_dir.download_context(segment) as dc:
+                    self._download(dc.segment, dc.dest_name)
+            except StandardError:
+                # Silence normal exceptions: if there's a systemic
+                # problem then just wait for it to become the
+                # 'explicit' segment to report it.  Prefetching can
+                # and will miss (resulting in 404s and so on), and it
+                # would be annoying to have those create log traffic.
+                pass
+
+
 class PartitionUploader(object):
     def __init__(self, aws_access_key_id, aws_secret_access_key,
                  backup_s3_prefix, rate_limit, gpg_key):
@@ -425,15 +500,6 @@ def do_lzop_s3_get(aws_access_key_id, aws_secret_access_key,
                 if e.status == 404:
                     # Do not retry if the key not present, this can happen
                     # under normal situations.
-                    logger.info(
-                        msg=('could not locate object while performing wal '
-                             'restore'),
-                        detail=('The absolute URI that could not be located '
-                                'is {url}.'.format(url=s3_url)),
-                        hint=('This can be normal when Postgres is trying to '
-                              'detect what timelines are available during '
-                              'restoration.'))
-
                     return False
                 else:
                     raise
