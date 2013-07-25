@@ -21,7 +21,7 @@ class DownloadContext(object):
 
     def __enter__(self):
         self.tf = tempfile.NamedTemporaryFile(
-            dir=self.prefetch_dirs.prefetched_tmp, delete=False)
+            dir=self.prefetch_dir.prefetched_tmp, delete=False)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -29,8 +29,8 @@ class DownloadContext(object):
             # Everything went well: flush to disk so that if a crash
             # occurs a corrupt pre-fetched WAL segment won't be sent
             # to Postgres.
-            os.sync(self.tf.fileno())
-            os.rename(self.tf.name, path.join(self.prefetch_dir,
+            os.fsync(self.tf.fileno())
+            os.rename(self.tf.name, path.join(self.prefetch_dir.prefetched_dir,
                                               self.segment.name))
         else:
             os.unlink(self.tf.name)
@@ -114,7 +114,7 @@ class PrefetchDirs(object):
                 hint=('Report this as a bug: '
                       'a better error message should be written.'))
 
-        shutil.rmtree(self.base, False, warn_on_cant_remove)
+        shutil.rmtree(self.prefetched_dir, False, warn_on_cant_remove)
 
     def contains(self, segment):
         return path.isfile(path.join(self.prefetched_dir, segment.name))
