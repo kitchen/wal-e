@@ -427,6 +427,9 @@ class S3Backup(object):
             group.start(prefetched_segment)
             started += 1
 
+        # Wait for downloads to finish.
+        group.join()
+
     def delete_old_versions(self, dry_run):
         assert s3_storage.CURRENT_VERSION not in s3_storage.OBSOLETE_VERSIONS
 
