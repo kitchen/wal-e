@@ -395,6 +395,7 @@ class S3Backup(object):
         segment = worker.WalSegment(wal_name, explicit=True)
 
         # Already pre-fetched: just promote the segment.
+        log.info(msg='fdr {0!r} {1!r} {2!r}'.format(pd, pd.contains(segment), segment.name))
         if pd.contains(segment):
             pd.promote(segment, wal_destination)
             return True
