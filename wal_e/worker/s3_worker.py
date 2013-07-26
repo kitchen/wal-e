@@ -250,10 +250,18 @@ class WalDownloader(object):
                         'prefix': self.prefix,
                         'state': 'begin'})
 
-        ret = do_lzop_s3_get(self.aws_access_key_id,
-                             self.aws_secret_access_key,
-                             s3_url, place,
-                             self.gpg_key_id is not None)
+        try:
+            ret = do_lzop_s3_get(self.aws_access_key_id,
+                                 self.aws_secret_access_key,
+                                 s3_url, place,
+                                 self.gpg_key_id is not None)
+        except boto.exception.S3ResponseError, e:
+            # Don't spam with failures about speculatively prefetched
+            # WAL.
+            if not segment.explicit and e.status == 404:
+                pass
+            else:
+                raise
 
         info = {'action': 'wal-fetch',
                 'key': s3_url,
