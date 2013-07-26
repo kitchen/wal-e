@@ -422,6 +422,7 @@ class S3Backup(object):
 
         while started < concurrency:
             prefetched_segment = seg_stream.next()
+            started += 1
 
             if pd.contains(prefetched_segment):
                 # Skip already-prefetched segments.
@@ -431,7 +432,6 @@ class S3Backup(object):
                 continue
 
             group.start(prefetched_segment)
-            started += 1
 
         # Wait for downloads to finish.
         group.join()
