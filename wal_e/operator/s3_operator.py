@@ -400,7 +400,7 @@ class S3Backup(object):
         # Already pre-fetched: just promote the segment.
         if pd.contains(segment):
             pd.promote(segment, wal_destination)
-            return
+            return True
 
         # Miss pre-fetch, download some data.
         if pd and not segment.segment_number:
@@ -439,6 +439,7 @@ class S3Backup(object):
         # Promote the original segment requested to begin with.  It
         # and maybe other segments should have been downloaded, now.
         pd.promote(segment, wal_destination)
+        return True
 
     def delete_old_versions(self, dry_run):
         assert s3_storage.CURRENT_VERSION not in s3_storage.OBSOLETE_VERSIONS
