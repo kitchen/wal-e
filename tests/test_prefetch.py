@@ -57,12 +57,18 @@ def test_contains_and_download(pd, pg_xlog):
 
     err = StandardError('Nope')
 
-    # Test failed download.
+    # Test failed download, via exception.
     with pytest.raises(StandardError) as e:
         with pd.download_context(segment) as dc:
             raise err
 
     assert e.value is err
+    assert not pd.contains(segment)
+
+    # Test failed download, via explicit, non-exceptional failure.
+    with pd.download_context(segment) as dc:
+        dc.fail()
+
     assert not pd.contains(segment)
 
     # Try a failed promotion of a non-existent file.

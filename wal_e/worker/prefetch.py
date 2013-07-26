@@ -40,7 +40,9 @@ class DownloadContext(object):
             assert exc_type is not None or self.failed
             os.unlink(self.tf.name)
             self.tf.close()
-            raise exc_type, exc_val, exc_tb
+
+            if exc_type is not None:
+                raise exc_type, exc_val, exc_tb
 
 
 class PrefetchDirs(object):
