@@ -15,24 +15,19 @@ class WalSegment(object):
         self.explicit = explicit
         self.name = path.basename(self.path)
 
-    @property
-    def tli(self):
-        match = s3_storage.SEGMENT_REGEXP.match(self.name)
+        # If possible, extract TLI and SegmentNumber information.
+        # Cases where this is not possible include a .history file (a
+        # TLI could be extracted for .history files, but so far, no
+        # other mechanism has needed it).
+        self.tli = None
+        self.segment_number = None
+        match = re.match(s3_storage.SEGMENT_REGEXP, self.name)
 
-        if match:
-            return match.groupdict()['tli']
-
-        return None
-
-    @property
-    def segment_number(self):
-        match = s3_storage.SEGMENT_REGEXP.match(self.name)
-
-        if match:
+        if match is not None:
             gd = match.groupdict()
-            return s3_storage.SegmentNumber(log=gd['log'], seg=gd['seg'])
-
-        return None
+            self.tli = gd['tli']
+            self.segment_number = s3_storage.SegmentNumber(log=gd['log'],
+                                                           seg=gd['seg'])
 
     def mark_done(self):
         """Mark the archive status of this segment as 'done'.
@@ -101,7 +96,9 @@ class WalSegment(object):
             # actually a .history file or something like that.
             return
 
-        yield sn.next_larger()
+        while True:
+            sn = sn.next_larger()
+            yield sn
 
 
 class WalTransferGroup(object):

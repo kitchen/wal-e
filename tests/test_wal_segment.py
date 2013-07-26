@@ -46,6 +46,25 @@ def test_simple_create():
     make_segment(1)
 
 
+def test_metadata_extraction():
+    tli = '1' * 8
+    log = '2' * 8
+    seg = '3' * 8
+
+    segment = worker.WalSegment('pg_xlog/' + tli + log + seg)
+
+    assert segment.tli == tli
+    assert segment.segment_number.log == log
+    assert segment.segment_number.seg == seg
+
+
+def test_metadata_history_file():
+    segment = worker.WalSegment('pg_xlog/00000001.history')
+
+    assert segment.tli is None
+    assert segment.segment_number is None
+
+
 def test_mark_done_invariant():
     """Check explicit segments cannot be .mark_done'd."""
     seg = make_segment(1, explicit=True)
@@ -116,3 +135,22 @@ def test_multi_search(pg_xlog):
     # Make sure nothing interesting happened to ignored files.
     pg_xlog.assert_exists(complete_segment_name, '.done')
     pg_xlog.assert_exists(ready_history_file_name, '.ready')
+
+
+def test_future_segment_stream():
+    segment = worker.WalSegment('pg_xlog/' + '0' * 8 * 3)
+    seg_stream = segment.future_segment_stream()
+    for i in xrange(1, 256):
+        segment = seg_stream.next()
+
+    sn = seg_stream.next()
+    assert sn.log == '00000001'
+    assert sn.seg == '00000000'
+
+
+def test_future_segment_stream_no_metadata():
+    segment = worker.WalSegment('pg_xlog/' + 'something-un-understood')
+    seg_stream = segment.future_segment_stream()
+
+    with pytest.raises(StopIteration):
+        seg_stream.next()
