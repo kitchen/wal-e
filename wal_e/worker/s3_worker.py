@@ -263,7 +263,7 @@ class WalDownloader(object):
         if ret:
             info.update({'state': 'complete'})
             logger.info(msg='wal fetched',
-                        **info)
+                        structured=info)
 
         else:
             info.update({'state': 'error'})
@@ -273,7 +273,7 @@ class WalDownloader(object):
                 hint=('This can be normal when Postgres is trying to '
                       'detect what timelines are available during '
                       'restoration.'),
-                **info)
+                structured=info)
 
         return ret
 
