@@ -265,7 +265,7 @@ class WalDownloader(object):
             logger.info(msg='wal fetched',
                         structured=info)
 
-        else:
+        elif segment.explicit:
             info.update({'state': 'error'})
 
             raise UserException(
@@ -274,6 +274,10 @@ class WalDownloader(object):
                       'detect what timelines are available during '
                       'restoration.'),
                 structured=info)
+        else:
+            # Don't spam with failures about speculatively prefetched
+            # WAL.
+            assert not ret and not segment.explicit
 
         return ret
 
