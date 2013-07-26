@@ -277,7 +277,7 @@ class WalDownloader(object):
 
         return ret
 
-    def __call__(self, segment, wal_destination):
+    def __call__(self, segment):
         try:
             with self.prefetch_dir.download_context(segment) as dc:
                 self._download(dc.segment, dc.dest_name)
