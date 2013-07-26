@@ -98,7 +98,10 @@ class WalSegment(object):
 
         while True:
             sn = sn.next_larger()
-            yield sn
+            segment = self.__class__(
+                path.join(path.dirname(self.path),
+                          self.tli + sn.log + sn.seg))
+            yield segment
 
 
 class WalTransferGroup(object):
