@@ -278,29 +278,22 @@ class WalDownloader(object):
         return ret
 
     def __call__(self, segment, wal_destination):
-        if segment.explicit:
-            if self.prefetch_dir.contains(segment):
-                # Already pre-fetched the WAL: rename it into the
-                # destination and exit.
-                self.prefetch_dir.promote(segment, wal_destination)
-                return
+        try:
+            with self.prefetch_dir.download_context(segment) as dc:
+                self._download(dc.segment, dc.dest_name)
+        except StandardError:
+            # Explicitly downloaded segments have their problems
+            # forwarded to the caller, since Postgres expects a
+            # do-or-die situation here.
+            if segment.explicit:
+                raise
 
-            # Prefetch miss: have to actually do a download.
-            #
-            # Exception raised to terminate execution if the download
-            # could not complete.
-            self._download(segment, wal_destination)
-        else:
-            try:
-                with self.prefetch_dir.download_context(segment) as dc:
-                    self._download(dc.segment, dc.dest_name)
-            except StandardError:
-                # Silence normal exceptions: if there's a systemic
-                # problem then just wait for it to become the
-                # 'explicit' segment to report it.  Prefetching can
-                # and will miss (resulting in 404s and so on), and it
-                # would be annoying to have those create log traffic.
-                pass
+            # For non-explcit segments, silence normal exceptions: if
+            # there's a systemic problem then just wait for it to
+            # become the 'explicit' segment to report it.  Prefetching
+            # can and will miss (resulting in 404s and so on), and it
+            # would be annoying to have those create log traffic.
+            assert not segment.explicit
 
 
 class PartitionUploader(object):

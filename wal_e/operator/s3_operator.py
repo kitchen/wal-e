@@ -397,6 +397,12 @@ class S3Backup(object):
 
         segment = worker.WalSegment(wal_name, explicit=True)
 
+        # Already pre-fetched: just promote the segment.
+        if pd.contains(segment):
+            pd.promote(segment, wal_destination)
+            return
+
+        # Miss pre-fetch, download some data.
         if pd and not segment.segment_number:
             # Not a regular segment, which represents a prefetch
             # hazard.  Turn off concurrency (and thus prefetching)
@@ -410,7 +416,7 @@ class S3Backup(object):
                                              pd,
                                              self.gpg_key_id)
         group = worker.WalTransferGroup(downloader)
-        group.start(segment, wal_destination)
+        group.start(segment)
         started = 1
         seg_stream = segment.future_segment_stream()
 
@@ -429,6 +435,10 @@ class S3Backup(object):
 
         # Wait for downloads to finish.
         group.join()
+
+        # Promote the original segment requested to begin with.  It
+        # and maybe other segments should have been downloaded, now.
+        pd.promote(segment, wal_destination)
 
     def delete_old_versions(self, dry_run):
         assert s3_storage.CURRENT_VERSION not in s3_storage.OBSOLETE_VERSIONS
