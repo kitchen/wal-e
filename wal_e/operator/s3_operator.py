@@ -378,7 +378,7 @@ class S3Backup(object):
         # Wait for uploads to finish.
         group.join()
 
-    def wal_s3_restore(self, wal_name, wal_destination, concurrency=1):
+    def wal_s3_restore(self, wal_name, wal_destination, concurrency=8):
         """
         Downloads up to 'concurrency' number of WAL files from S3
 
