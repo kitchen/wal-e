@@ -143,9 +143,10 @@ def test_future_segment_stream():
     for i in xrange(1, 256):
         segment = seg_stream.next()
 
-    sn = seg_stream.next()
-    assert sn.log == '00000001'
-    assert sn.seg == '00000000'
+    segment = seg_stream.next()
+    assert segment.tli == '00000000'
+    assert segment.segment_number.log == '00000001'
+    assert segment.segment_number.seg == '00000000'
 
 
 def test_future_segment_stream_no_metadata():
