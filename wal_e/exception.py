@@ -30,7 +30,7 @@ class UserException(Exception):
     STRUCTURED: time=... pid=...
     """
 
-    def __init__(self, msg=None, detail=None, hint=None):
+    def __init__(self, msg=None, detail=None, hint=None, structured=None):
         # msg uses a keyword argument with a default to make the
         # multiprocessing module happy, as it seems to set them after
         # the fact.  Realistically, one should *always* be setting msg
@@ -38,11 +38,13 @@ class UserException(Exception):
         self.msg = msg
         self.detail = detail
         self.hint = hint
+        self.structured = structured
         self.severity = ERROR
 
     def __str__(self):
         return "{0}: {1}".format(getLevelName(self.severity),
-                WalELogger.fmt_logline(self.msg, self.detail, self.hint))
+                WalELogger.fmt_logline(self.msg, self.detail, self.hint,
+                                       self.structured))
 
 
 class UserCritical(UserException):
