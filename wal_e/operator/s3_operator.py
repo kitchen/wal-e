@@ -416,6 +416,14 @@ class S3Backup(object):
 
         while started < concurrency:
             prefetched_segment = seg_stream.next()
+
+            if pd.contains(prefetched_segment):
+                # Skip already-prefetched segments.
+                #
+                # Can occur if a prior pre-fetch failed, leaving a
+                # hole.
+                continue
+
             group.start(prefetched_segment)
             started += 1
 
