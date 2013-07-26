@@ -242,13 +242,14 @@ class WalDownloader(object):
         s3_url = '{0}/wal_{1}/{2}.lzo'.format(
             self.prefix, s3_storage.CURRENT_VERSION, segment.name)
 
-        logger.info(
-            msg='begin wal restore',
-            structured={'action': 'wal-fetch',
-                        'key': s3_url,
-                        'seg': segment.name,
-                        'prefix': self.prefix,
-                        'state': 'begin'})
+        if segment.explicit:
+            logger.info(
+                msg='begin wal restore',
+                structured={'action': 'wal-fetch',
+                            'key': s3_url,
+                            'seg': segment.name,
+                            'prefix': self.prefix,
+                            'state': 'begin'})
 
         try:
             ret = do_lzop_s3_get(self.aws_access_key_id,
@@ -256,9 +257,9 @@ class WalDownloader(object):
                                  s3_url, place,
                                  self.gpg_key_id is not None)
         except boto.exception.S3ResponseError, e:
-            # Don't spam with failures about speculatively prefetched
-            # WAL.
             if not segment.explicit and e.status == 404:
+                # Don't spam with failures about speculatively
+                # prefetched WAL.
                 pass
             else:
                 raise
@@ -269,6 +270,8 @@ class WalDownloader(object):
                 'prefix': self.prefix}
 
         if ret:
+            # Always update the log, prefetch or no, about
+            # successfully downloaded WAL.
             info.update({'state': 'complete'})
             logger.info(msg='wal fetched',
                         structured=info)
