@@ -48,7 +48,7 @@ class SegmentNumber(collections.namedtuple('SegmentNumber',
         assert h.startswith('0x')
         assert len(h) <= 10
 
-        name = hex(integral)[2:].zfill(8)
+        name = hex(integral)[2:].upper().zfill(8)
         assert len(name) == 8
 
         return name
