@@ -389,11 +389,8 @@ class S3Backup(object):
         basename(wal_path), so both are required.
         """
         xlog_dir = path.dirname(wal_destination)
-        pd = None
-
-        if concurrency > 1:
-            pd = PrefetchDirs(xlog_dir)
-            pd.create()
+        pd = PrefetchDirs(xlog_dir)
+        pd.create()
 
         segment = worker.WalSegment(wal_name, explicit=True)
 
