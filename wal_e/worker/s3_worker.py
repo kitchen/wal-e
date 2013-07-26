@@ -295,7 +295,11 @@ class WalDownloader(object):
     def __call__(self, segment):
         try:
             with self.prefetch_dir.download_context(segment) as dc:
-                self._download(dc.segment, dc.dest_name)
+                downloaded = self._download(dc.segment, dc.dest_name)
+
+                if not downloaded:
+                    dc.fail()
+
         except StandardError:
             # Explicitly downloaded segments have their problems
             # forwarded to the caller, since Postgres expects a

@@ -14,10 +14,14 @@ class DownloadContext(object):
     def __init__(self, prefetch_dir, segment):
         self.prefetch_dir = prefetch_dir
         self.segment = segment
+        self.failed = None
 
     @property
     def dest_name(self):
         return self.tf.name
+
+    def fail(self):
+        self.failed = True
 
     def __enter__(self):
         self.tf = tempfile.NamedTemporaryFile(
@@ -25,7 +29,7 @@ class DownloadContext(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
+        if exc_type is None and not self.failed:
             # Everything went well: flush to disk so that if a crash
             # occurs a corrupt pre-fetched WAL segment won't be sent
             # to Postgres.
@@ -33,6 +37,7 @@ class DownloadContext(object):
             os.rename(self.tf.name, path.join(self.prefetch_dir.prefetched_dir,
                                               self.segment.name))
         else:
+            assert exc_type is not None or self.failed
             os.unlink(self.tf.name)
             self.tf.close()
             raise exc_type, exc_val, exc_tb
